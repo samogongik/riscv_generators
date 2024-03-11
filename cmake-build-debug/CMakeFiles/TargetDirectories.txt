@@ -1,6 +1,0 @@
-/mnt/c/Users/Сэргей/Desktop/rickv_generator/cmake-build-debug/CMakeFiles/rickv_generator.dir
-/mnt/c/Users/Сэргей/Desktop/rickv_generator/cmake-build-debug/CMakeFiles/edit_cache.dir
-/mnt/c/Users/Сэргей/Desktop/rickv_generator/cmake-build-debug/CMakeFiles/rebuild_cache.dir
-/mnt/c/Users/Сэргей/Desktop/rickv_generator/cmake-build-debug/google_tests/CMakeFiles/tester.dir
-/mnt/c/Users/Сэргей/Desktop/rickv_generator/cmake-build-debug/google_tests/CMakeFiles/edit_cache.dir
-/mnt/c/Users/Сэргей/Desktop/rickv_generator/cmake-build-debug/google_tests/CMakeFiles/rebuild_cache.dir

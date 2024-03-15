@@ -2,40 +2,44 @@
 #include <vector>
 #include <array>
 
-class RV32I_RegisterFile {
+class RV32I_RegisterFile final{
 private:
     std::array<int32_t, 32> regs;
 
 public:
-    RV32I_RegisterFile() : regs({}) {}
+    RV32I_RegisterFile() : regs({}) {
+        for (auto elem : regs){
+            elem = 0;
+        }
+    }
 
-    int32_t read(int reg_num) {
+    int32_t read(int reg_num) const noexcept{
         return regs[reg_num];
     }
 
-    void write(int reg_num, int32_t value) {
+    void write(int reg_num, int32_t value) noexcept{
         if (reg_num != 0)
             regs[reg_num] = value;
     }
 };
 
-class RV32I_Memory {
+class RV32I_Memory final{
 private:
     std::vector<int32_t> mem;
 
 public:
     RV32I_Memory(int size) : mem(size, 0) {}
 
-    int32_t read(int32_t address) {
+    int32_t read(int32_t address) const noexcept {
         return mem[address];
     }
 
-    void write(int32_t address, int32_t value) {
+    void write(int32_t address, int32_t value) noexcept{
         mem[address] = value;
     }
 };
 
-class RV32I_Processor {
+class RV32I_Processor final{
 private:
     RV32I_RegisterFile regfile;
     RV32I_Memory memory;
@@ -44,19 +48,19 @@ private:
 public:
     RV32I_Processor(int mem_size) : memory(mem_size), pc(0) {}
 
-    int32_t readRegister(int reg_num) {
+    int32_t readRegister(int reg_num) const noexcept{
         return regfile.read(reg_num);
     }
 
-    void writeRegister(int reg_num, int value) {
+    void writeRegister(int reg_num, int value) noexcept{
         regfile.write(reg_num, value);
     }
 
-    int32_t readMemory(int32_t address){
+    int32_t readMemory(int32_t address) const noexcept{
         return memory.read(address);
     }
 
-    void writeMemory(int32_t address, int32_t value){
+    void writeMemory(int32_t address, int32_t value) noexcept{
         memory.write(address, value);
     }
 
@@ -98,11 +102,11 @@ public:
                                         throw std::runtime_error("attempt to divide by zero");
                                     }
                                     break;
-                                default: throw std::runtime_error("unknown funct3");
+                                default: throw std::runtime_error("unknown funct3 for R-type instruction" + std::to_string(funct3));
                             }
                             break;
 
-                        default:  throw std::runtime_error ("unknown funct7");
+                        default:  throw std::runtime_error ("unknown funct7 for R-type instruction" + std::to_string(funct7));
                     }
                     break;
 
@@ -138,7 +142,7 @@ public:
                             regfile.write(rd, byte);
                             break;
 
-                        default:  throw std::runtime_error ("unknown func3");
+                        default:  throw std::runtime_error ("unknown func3 for I-type instruction" + std::to_string(funct3));
                     }
                     break;
 
@@ -159,7 +163,7 @@ public:
                             regfile.write(rd, regfile.read(rs1) | imm);
                             break;
 
-                        default:  throw std::runtime_error ("unknown funct3");
+                        default:  throw std::runtime_error ("unknown funct3 for I-type - Immediate" + std::to_string(funct3));
                     }
                     break;
 
@@ -183,7 +187,7 @@ public:
                             break;
 
                         default:
-                            throw std::runtime_error("unknown funct3 for S-type instruction");
+                            throw std::runtime_error("unknown funct3 for S-type instruction" + std::to_string(funct3));
                     }
                     break;
 
@@ -194,7 +198,7 @@ public:
                     regfile.write(rd, imm);
                     break;
 
-                default:  throw std::runtime_error ("unknown opcode");
+                default:  throw std::runtime_error ("unknown opcode" + std::to_string(opcode));
 
             }
             pc++;

@@ -8,10 +8,11 @@ int main() {
                                          0x00308113,  // addi x2, x1, 3
                                          0x00410113}; // addi x2, x2, 4
 
-    RV32I_Processor processor(1024);
+    RV32I_Processor processor(1024, 3);
+    processor.loadInstructionsMemory(instructions);
 
 
-    processor.execute(instructions);
+    processor.execute();
 
 
     for (int i = 0; i < 32; ++i) {

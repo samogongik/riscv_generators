@@ -17,9 +17,12 @@ public:
         return regs[reg_num];
     }
 
-    void write(int reg_num, int32_t value) noexcept{
+    void write(int reg_num, int32_t value){
         if (reg_num != 0)
             regs[reg_num] = value;
+        else {
+            throw std::runtime_error ("attempt to change value x0");
+        }
     }
 };
 
@@ -44,15 +47,22 @@ private:
     RV32I_RegisterFile regfile;
     RV32I_Memory memory;
     int32_t pc;
+    int32_t _amountInstructions = 0;
 
 public:
-    RV32I_Processor(int mem_size) : memory(mem_size), pc(0) {}
+    RV32I_Processor(int mem_size, int32_t amountInstructions = 0) : memory(mem_size), pc(0), _amountInstructions(amountInstructions) {}
+
+    void loadInstructionsMemory (const std::vector<int32_t>& instr) noexcept {
+        for (int i = 0; i < instr.size(); i++){
+            memory.write(i, instr[i]);
+        }
+    }
 
     int32_t readRegister(int reg_num) const noexcept{
         return regfile.read(reg_num);
     }
 
-    void writeRegister(int reg_num, int value) noexcept{
+    void writeRegister(int reg_num, int value) {
         regfile.write(reg_num, value);
     }
 
@@ -64,16 +74,16 @@ public:
         memory.write(address, value);
     }
 
-    void execute(const std::vector<int32_t>& instr) {
-        while (pc < instr.size()) {
+    void execute() {
+        while (pc < _amountInstructions) {
+            bool flagJump = false;
+            int opcode = readMemory(pc) & 0x7F;
+            int rd = (readMemory(pc) >> 7) & 0x1F;
+            int rs1 = (readMemory(pc) >> 15) & 0x1F;
+            int rs2 = (readMemory(pc) >> 20) & 0x1F;
 
-            int opcode = instr[pc] & 0x7F;
-            int rd = (instr[pc] >> 7) & 0x1F;
-            int rs1 = (instr[pc] >> 15) & 0x1F;
-            int rs2 = (instr[pc] >> 20) & 0x1F;
-
-            int funct7 = (instr[pc] >> 25) & 0x7F;
-            int funct3 = (instr[pc] >> 12) & 0x7;
+            int funct7 = (readMemory(pc) >> 25) & 0x7F;
+            int funct3 = (readMemory(pc) >> 12) & 0x7;
             int32_t imm = 0;
 
             switch (opcode) {
@@ -88,31 +98,13 @@ public:
                             regfile.write(rd, regfile.read(rs1) - regfile.read(rs2));
                             break;
 
-                        case 0b0000001:
-                            switch (funct3) {
-                                case 0b000:
-                                    regfile.write(rd, regfile.read(rs1) * regfile.read(rs2));
-                                    break;
-
-                                case 0b100:
-                                    if (regfile.read(rs2) != 0) {
-                                        regfile.write(rd, regfile.read(rs1) / regfile.read(rs2));
-                                    }
-                                    else {
-                                        throw std::runtime_error("attempt to divide by zero");
-                                    }
-                                    break;
-                                default: throw std::runtime_error("unknown funct3 for R-type instruction" + std::to_string(funct3));
-                            }
-                            break;
-
-                        default:  throw std::runtime_error ("unknown funct7 for R-type instruction" + std::to_string(funct7));
+                        default:  throw std::runtime_error ("unknown funct7 for R-type instruction = " + std::to_string(funct7));
                     }
                     break;
 
                 case  0b0000011: // I-type - Load
                     int32_t load_address;
-                    imm = instr[pc] >> 20;
+                    imm = readMemory(pc) >> 20;
                     load_address = regfile.read(rs1) + imm;
 
 
@@ -142,13 +134,13 @@ public:
                             regfile.write(rd, byte);
                             break;
 
-                        default:  throw std::runtime_error ("unknown func3 for I-type instruction" + std::to_string(funct3));
+                        default:  throw std::runtime_error ("unknown func3 for I-type instruction = " + std::to_string(funct3));
                     }
                     break;
 
 
                 case 0b0010011: // I-type - Immediate
-                    imm = instr[pc] >> 20;
+                    imm = readMemory(pc) >> 20;
                     switch (funct3) {
 
                         case 0b000:
@@ -163,13 +155,13 @@ public:
                             regfile.write(rd, regfile.read(rs1) | imm);
                             break;
 
-                        default:  throw std::runtime_error ("unknown funct3 for I-type - Immediate" + std::to_string(funct3));
+                        default:  throw std::runtime_error ("unknown funct3 for I-type - Immediate = " + std::to_string(funct3));
                     }
                     break;
 
                 case 0b0100011: //S-type
                     int32_t store_address, store_data;
-                    imm = ((instr[pc] >> 25) << 5) | ((instr[pc] >> 7) & 0x1F);
+                    imm = ((readMemory(pc) >> 25) << 5) | ((readMemory(pc) >> 7) & 0x1F);
                     store_address = regfile.read(rs1) + imm;
                     store_data = regfile.read(rs2);
 
@@ -187,21 +179,111 @@ public:
                             break;
 
                         default:
-                            throw std::runtime_error("unknown funct3 for S-type instruction" + std::to_string(funct3));
+                            throw std::runtime_error("unknown funct3 for S-type instruction = " + std::to_string(funct3));
                     }
                     break;
 
 
 
-                case 0b1101111://UJ-type
-                    imm = instr[pc] >> 12;
+                case 0b0110111: // LUI
+                    rd = (readMemory(pc) >> 7) & 0x1F;
+                    imm = readMemory(pc) & 0xFFFFF000;
                     regfile.write(rd, imm);
                     break;
 
-                default:  throw std::runtime_error ("unknown opcode" + std::to_string(opcode));
+                case 0b0010111: // AUIPC
+                    rd = (readMemory(pc) >> 7) & 0x1F;
+                    imm = readMemory(pc) & 0xFFFFF000;
+                    imm += pc;
+                    regfile.write(rd, imm);
+                    break;
+
+                case 0b1101111: // JAL
+                    rd = (readMemory(pc) >> 7) & 0x1F;
+                    imm = ((readMemory(pc) & 0x80000000) ? 0xFFF00000 : 0x0) |
+                          ((readMemory(pc) >> 20) & 0xFF) |
+                          ((readMemory(pc) >> 9) & 0x800) |
+                          ((readMemory(pc) >> 10) & 0x7FE);
+
+                    regfile.write(rd, pc + 1);
+                    pc += imm;
+                    flagJump = true;
+                    break;
+
+                case 0b1100111: // JALR
+                    rd = (readMemory(pc) >> 7) & 0x1F;
+                    rs1 = (readMemory(pc) >> 15) & 0x1F;
+
+                    imm = ((readMemory(pc) & 0x80000000) ? 0xFFF00000 : 0x0) |
+                          ((readMemory(pc) >> 20) & 0xFFF); // Bits 11:0
+
+                    int32_t address;
+                    address = regfile.read(rs1) + imm;
+                    regfile.write(rd, pc + 1);
+                    pc = address;
+                    flagJump = true;
+                    break;
+
+                case 0b1100011: // B-type
+                    int32_t branch_target;
+                    imm = ((readMemory(pc) & 0x80000000) ? 0xFFFFF000 : 0x0) |
+                          ((readMemory(pc) >> 8) & 0b1111) |
+                          ((readMemory(pc) >> 25) & 0b111111) |
+                          ((readMemory(pc) >> 7) & 0b1);
+
+                    branch_target = pc + imm;
+                    flagJump = true;
+
+                    switch (funct3) {
+                        case 0b000: // BEQ
+                            if (regfile.read(rs1) == regfile.read(rs2)) {
+                                pc = branch_target;
+
+                            }
+                            break;
+
+                        case 0b001: // BNE
+                            if (regfile.read(rs1) != regfile.read(rs2)) {
+                                pc = branch_target;
+                            }
+                            break;
+
+                        case 0b100: // BLT
+                            if (regfile.read(rs1) < regfile.read(rs2)) {
+                                pc = branch_target;
+                            }
+                            break;
+
+                        case 0b101: // BGE
+                            if (regfile.read(rs1) >= regfile.read(rs2)) {
+                                pc = branch_target;
+                            }
+                            break;
+
+                        case 0b110: // BLTU
+                            if (static_cast<uint32_t>(regfile.read(rs1)) < static_cast<uint32_t>(regfile.read(rs2))) {
+                                pc = branch_target;
+                            }
+                            break;
+
+                        case 0b111: // BGEU
+                            if (static_cast<uint32_t>(regfile.read(rs1)) >= static_cast<uint32_t>(regfile.read(rs2))) {
+                                pc = branch_target;
+                            }
+                            break;
+
+                        default:
+                            throw std::runtime_error("unknown funct3 for B-type instruction = " + std::to_string(funct3));
+                    }
+                    break;
+
+
+                default:  throw std::runtime_error ("unknown opcode = " + std::to_string(opcode));
 
             }
-            pc++;
+            if (!flagJump){
+                pc++;
+            }
         }
     }
 };
